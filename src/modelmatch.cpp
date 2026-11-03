@@ -39,7 +39,7 @@ namespace roadmarking
 
 		for (int j = 0; j < modelFileNames.size(); j++) //for different models
 		{
-			modelPointClouds[j] = boost::make_shared<pcXYZI>();
+			modelPointClouds[j] = pcXYZIPtr(new pcXYZI);
 			
 			//liblas
 			//Bounds bound_3d_temp;

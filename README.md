@@ -6,23 +6,37 @@ This repository contains a C++ implementation of the automatic extraction, class
 -------
 
 ## About
-Version 1.2: passed on Ubuntu 16.04. For former versions, please check the other branches.
+Version 1.2. The current build is also compatible with Ubuntu 22.04, PCL 1.12 and OpenCV 4.5.
 
-Dependent 3rd Party Libs: Eigen3, PCL1.8, OpenCV2, LibLas, DXFLib
+Dependencies: CMake 3.15 or later, a C++14 compiler, Eigen3, PCL, OpenCV, Boost and libLAS. DXFLib is included in the repository.
 
 Application Scenarios: MLS or ALS point cloud for highway or urban roads
 
 ## How to use
-1. Install dependent libs by `sh ./script/download_dependent_lib.sh`.
+1. Install the development packages for Eigen3, PCL, OpenCV and Boost. On Ubuntu 22.04:
+
+```
+sudo apt install build-essential cmake git libeigen3-dev libpcl-dev libopencv-dev libboost-all-dev
+```
+
+Install libLAS separately if it is unavailable in the system. For example, to build it locally without modifying system libraries:
+
+```
+git clone https://github.com/libLAS/libLAS.git /tmp/roadmarking-liblas
+git -C /tmp/roadmarking-liblas checkout 0839c6cab5fd8b629cc8e5e298193fa56078bccb
+cmake -S /tmp/roadmarking-liblas -B /tmp/roadmarking-liblas-build \
+  -DCMAKE_INSTALL_PREFIX="$PWD/.deps" -DWITH_GDAL=OFF -DWITH_GEOTIFF=OFF
+cmake --build /tmp/roadmarking-liblas-build -j2
+cmake --install /tmp/roadmarking-liblas-build
+```
+
+Run these commands from the repository root. This configuration supports uncompressed LAS, but not LAZ compression or libLAS coordinate reference system transformations.
 
 2. Build the repository:
 
 ```
-mkdir build
-cd build
-cmake .. 
-make 
-cd ..
+cmake -S . -B build
+cmake --build build -j1
 ```
 
 3. Prepare the model pool (take `./model_pool/xxx` as an example) and configure the parameter list (take `./config/xxx.txt` as an example).

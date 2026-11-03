@@ -1,4 +1,6 @@
 #include "imageprocess.h"
+#include <stack>
+#include <boost/filesystem.hpp>
 
 using namespace std;
 using namespace cv;
@@ -361,7 +363,7 @@ namespace roadmarking
 
 		Mat grayImage, binImage;
 		cvtColor(img, grayImage, COLOR_BGR2GRAY);
-		threshold(grayImage, binImage, 0, 1, CV_THRESH_BINARY);
+		threshold(grayImage, binImage, 0, 1, cv::THRESH_BINARY);
 
 		for (size_t i = timin; i < timin + img.rows; i++)
 		{
@@ -381,7 +383,7 @@ namespace roadmarking
 
 		Mat grayImage, binImage;
 		cvtColor(img, grayImage, COLOR_BGR2GRAY);
-		threshold(grayImage, binImage, 0, 1, CV_THRESH_BINARY);
+		threshold(grayImage, binImage, 0, 1, cv::THRESH_BINARY);
 
 		for (size_t i = timin; i < timin + img.rows; i++)
 		{
@@ -568,7 +570,7 @@ namespace roadmarking
 				max_index = i;
 			}
 		}
-		threshold(inputImage, result, max_index, 1, CV_THRESH_BINARY); // > max_index assign as 1   < max_index assign as 0
+		threshold(inputImage, result, max_index, 1, cv::THRESH_BINARY); // > max_index assign as 1   < max_index assign as 0
 		return result;
 	}
 
@@ -1041,7 +1043,7 @@ namespace roadmarking
 		src.convertTo(imageGray, CV_8UC1);
 		corner = Mat::zeros(src.size(), CV_32FC1);
 		cornerHarris(imageGray, corner, 3, 3, 0.04, BORDER_DEFAULT);
-		normalize(corner, corner8u, 0, 255, CV_MINMAX); 
+		normalize(corner, corner8u, 0, 255, cv::NORM_MINMAX);
 		convertScaleAbs(corner8u, cornershow);
 		cornerwithimg = colorlabel.clone();
 		for (int i = 0; i < src.rows; i++)

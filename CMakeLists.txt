@@ -1,9 +1,12 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.15)
 
 project(roadmarking)
 
-SET(CMAKE_CXX_FLAGS "-O3 -std=c++11 -w -fopenmp -pthread ")
-SET(CMAKE_C_FLAGS "-O3 -std=c++11 -fopenmp -pthread ")
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fopenmp -pthread")
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -fopenmp -pthread")
+list(PREPEND CMAKE_PREFIX_PATH "${PROJECT_SOURCE_DIR}/.deps")
 
 #SET(CMAKE_BUILD_TYPE "Debug") 
 #SET(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g -ggdb")

@@ -1,5 +1,6 @@
 #include "ground_extraction.h"
 #include <pcl/io/pcd_io.h>
+#include <cfloat>
 
 
 //Reference: Two-step adaptive extraction method for ground points and breaklines from lidar point clouds, Bisheng Yang, Ronggang Huang, et al. ISPRS Journal of Photogrammetry and Remote Sensing

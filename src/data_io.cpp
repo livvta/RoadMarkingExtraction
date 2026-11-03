@@ -24,6 +24,8 @@
 #include <dl_dxf.h>
 #include <dl_entities.h>
 
+#include <chrono>
+#include <thread>
 #include <iosfwd>
 #include <fstream>
 
@@ -745,7 +747,7 @@ namespace roadmarking
 		while (!viewer->wasStopped())
 		{
 			viewer->spinOnce(100);
-			boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+			std::this_thread::sleep_for(std::chrono::microseconds(100000));
 		}
 	}
 
@@ -789,7 +791,7 @@ namespace roadmarking
 		while (!viewer->wasStopped())
 		{
 			viewer->spinOnce(100);
-			boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+			std::this_thread::sleep_for(std::chrono::microseconds(100000));
 		}
 	}
 
@@ -879,7 +881,7 @@ namespace roadmarking
 		while (!viewer->wasStopped())
 		{
 			viewer->spinOnce(100);
-			boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+			std::this_thread::sleep_for(std::chrono::microseconds(100000));
 		}
 	}
 
@@ -966,7 +968,7 @@ namespace roadmarking
 		while (!viewer->wasStopped())
 		{
 			viewer->spinOnce(100);
-			boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+			std::this_thread::sleep_for(std::chrono::microseconds(100000));
 		}
 	}
 	void DataIo::displaymarkVect(const RoadMarkings &roadmarkings)
@@ -1207,7 +1209,7 @@ namespace roadmarking
 		while (!viewer->wasStopped())
 		{
 			viewer->spinOnce(100);
-			boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+			std::this_thread::sleep_for(std::chrono::microseconds(100000));
 		}
 	}
 
@@ -1451,7 +1453,7 @@ namespace roadmarking
 		while (!viewer->wasStopped())
 		{
 			viewer->spinOnce(100);
-			boost::this_thread::sleep(boost::posix_time::microseconds(100000));
+			std::this_thread::sleep_for(std::chrono::microseconds(100000));
 		}
 	}
 

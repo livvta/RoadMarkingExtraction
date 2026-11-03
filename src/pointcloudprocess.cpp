@@ -15,6 +15,7 @@
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/filters/project_inliers.h>
 
+#include <cfloat>
 #include <set>
 #include <unordered_set>
 #include <algorithm>

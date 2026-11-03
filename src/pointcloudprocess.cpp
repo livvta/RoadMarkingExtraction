@@ -130,8 +130,11 @@ namespace roadmarking
 			{
 				intensitylist[j] = inclouds[i].points[j].intensity;   
 			}
+			// Empty or zero-intensity candidates have no usable intensity contrast.
+			if (intensitylist.empty()) continue;
 			int intensitymax, intensitymin;
 			intensitymax = *(max_element(intensitylist.begin(), intensitylist.end()));
+			if (intensitymax <= 0) continue;
 			//intensitymin = *(min_element(intensitylist.begin(), intensitylist.end()));
 
 			//OTSU Method
@@ -175,6 +178,7 @@ namespace roadmarking
 						u1tmp += t * h[t];
 					}
 				}
+				if (w0 <= 0 || w1 <= 0) continue;
 				u0 = u0tmp / w0;       
 				u1 = u1tmp / w1;     
 				u = u0tmp + u1tmp;    

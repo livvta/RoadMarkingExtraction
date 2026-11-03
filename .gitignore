@@ -1,3 +1,36 @@
+# Project-local dependencies and generated binaries
 /.deps/
 /bin/
 /build/
+/build-*/
+/cmake-build-*/
+/dependent_libs/
+
+# CMake and compiler output
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+*.o
+*.a
+*.so
+*.so.*
+
+# Local input data and generated results
+/data/
+/output/
+/results/
+*_out/
+*.las
+*.laz
+*.pcd
+!/model_pool/**/*.pcd
+
+# Local editor and OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

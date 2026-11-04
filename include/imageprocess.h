@@ -3,6 +3,7 @@
 
 
 #include "utility.h"
+#include <cstdint>
 
 //pcl
 #include <pcl/point_cloud.h>  
@@ -64,14 +65,13 @@ namespace roadmarking
 		  void saveimg(std::string base_folder, int file_index, const Mat &ProjI, const Mat &ProjZ, const Mat &ProjD, const Mat &ProjImf, const Mat &GI, const Mat &GZ, const Mat &BZ, const Mat &BD, const Mat &GIR, const Mat &BI, const Mat &BIF, const Mat &Label); 
 		  void saveimg(const Mat &ProjI, const Mat &ProjImf, const Mat &GI, const Mat &BI, const Mat &BIF, const Mat &Label);
 
-		  int nx, ny; //pixel number
-		  int timin, tjmin; //truncated pixel no.
+		  void releaseGridIndices(int whatcloud);
+
+		  int nx = 0, ny = 0; //pixel number
+		  int timin = 0, tjmin = 0; //truncated pixel no.
 		  float minX, minY, minZ;  //bounding box minimum value
 		  float res;  //resolution
-		  vector<vector<vector<int>>> CMatrixIndice;    //cloud
-		  vector<vector<vector<int>>> GCMatrixIndice;   //ground cloud
-		  vector<vector<vector<int>>> NGCMatrixIndice;  //non-ground cloud
-		  int totallabel; 
+		  int totallabel = 1;
 		  vector<vector <int>>  labelx;  
 		  vector<vector <int>>  labely;  
 
@@ -79,6 +79,17 @@ namespace roadmarking
 	protected:
 	
 	  private:
+          struct PixelPointIndex
+          {
+              std::vector<std::uint32_t> offsets;
+              std::vector<std::uint32_t> points;
+          };
+          PixelPointIndex point_indices_[3];
+          void buildPointIndex(const pcXYZIPtr &cloud, PixelPointIndex &index);
+          const PixelPointIndex &pointIndex(int whatcloud) const;
+          std::size_t pixelIndex(const pcl::PointXYZI &point) const;
+          void imageToCloud(const Mat &img, const pcXYZIPtr &cloud, pcXYZIPtr &out, int whatcloud);
+          void labelsToCloud(const Mat &img, const pcXYZIPtr &cloud, vector<pcXYZI> &out, double dZ, int whatcloud);
 		 
 	};
 

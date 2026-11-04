@@ -1,5 +1,10 @@
 #include "imageprocess.h"
-#include <stack>
+#include <algorithm>
+#include <cfloat>
+#include <climits>
+#include <cmath>
+#include <limits>
+#include <stdexcept>
 #include <boost/filesystem.hpp>
 
 using namespace std;
@@ -8,498 +13,250 @@ using namespace cv;
 namespace roadmarking
 {
 
-	void Imageprocess::pcgrid(Bounds &boundingbox, float resolution)
-	{
-		//boundingbox order: Xmin,Ymin,Zmin,Xmax,Ymax,Zmax
-		float lx, ly, lz;
-		int ix, iy;
-		lx = boundingbox.max_x - boundingbox.min_x;
-		ly = boundingbox.max_y - boundingbox.min_y;
-		lz = boundingbox.max_z - boundingbox.min_z;
-
-		minX = -0.5 * lx;
-		minY = -0.5 * ly;
-		minZ = -0.5 * lz;
-
-		nx = lx / resolution + 1;
-		ny = ly / resolution + 1;
-
-		res = resolution;
-
-		cout << "Image Size: " << nx << " * " << ny << endl;
-	}
-
-	void Imageprocess::savepcgrid(Bounds &boundingbox, float resolution, pcXYZIPtr &c, pcXYZIPtr &gc, pcXYZIPtr &ngc)
-	{
-		float lx, ly, lz;
-		int ix, iy;
-		lx = boundingbox.max_x - boundingbox.min_x;
-		ly = boundingbox.max_y - boundingbox.min_y;
-		lz = boundingbox.max_z - boundingbox.min_z;
-
-		minX = -0.5 * lx;
-		minY = -0.5 * ly;
-		minZ = -0.5 * lz;
-
-		// cout << lx << "," << ly << "," << lz << endl;
-		// cout << boundingbox.max_x << "," << boundingbox.max_y << "," << boundingbox.max_z << endl;
-
-		nx = lx / resolution + 1;
-		ny = ly / resolution + 1;
-
-		cout << "Image Size: " << nx << " x " << ny << endl;
-
-		if(nx * ny > 2e7)
-			cout<<"Warning: Too much grid map, the system may run out of memory."<<endl;
-
-		CMatrixIndice.resize(nx, vector<vector<int>>(ny, vector<int>(0)));
-
-		//Saving point indices 
-		for (int i = 0; i < c->points.size(); i++)
-		{
-			ix = (int)((c->points[i].x - minX) / resolution);
-			iy = (int)((c->points[i].y - minY) / resolution);
-			CMatrixIndice[ix][iy].push_back(i);
-		}
-        c.reset(new pcXYZI()); //free the memory
-        
-	    GCMatrixIndice.resize(nx, vector<vector<int>>(ny, vector<int>(0)));
-		NGCMatrixIndice.resize(nx, vector<vector<int>>(ny, vector<int>(0)));
-
-		for (int i = 0; i < gc->points.size(); i++)
-		{
-			ix = (int)((gc->points[i].x - minX) / resolution);
-			iy = (int)((gc->points[i].y - minY) / resolution);
-			GCMatrixIndice[ix][iy].push_back(i);
-		}
-		for (int i = 0; i < ngc->points.size(); i++)
-		{
-			ix = (int)((ngc->points[i].x - minX) / resolution);
-			iy = (int)((ngc->points[i].y - minY) / resolution);
-			NGCMatrixIndice[ix][iy].push_back(i);
-		}
-	}
-
-	void Imageprocess::savepcgrid(Bounds &boundingbox, float resolution, const pcXYZIPtr &c)
-	{
-		float lx, ly, lz;
-		int ix, iy;
-		lx = boundingbox.max_x - boundingbox.min_x;
-		ly = boundingbox.max_y - boundingbox.min_y;
-		lz = boundingbox.max_z - boundingbox.min_z;
-
-		minX = -0.5 * lx;
-		minY = -0.5 * ly;
-		minZ = -0.5 * lz;
-
-		nx = lx / resolution + 1;
-		ny = ly / resolution + 1;
-
-		res = resolution;
-
-		cout << "Image Size: " << nx << " * " << ny << endl;
-
-		CMatrixIndice.resize(nx);
-
-		for (size_t i = 0; i < nx; i++)
-		{
-			CMatrixIndice[i].resize(ny);
-		}
-
-		//Saving point indices 
-		for (size_t i = 0; i < c->points.size(); i++)
-		{
-			ix = (c->points[i].x - minX) / res;
-			iy = (c->points[i].y - minY) / res;
-			CMatrixIndice[ix][iy].push_back(i);
-		}
-	}
-
-	void Imageprocess::pc2imgI(const pcXYZIPtr &cloud, int whatcloud, Mat &img, float times_std)
-	{
-
-		double mini, maxi;	//min and max Intensity
-		double meani, stdi; //mean and standard deviation of Intensity
-		int Number_non_zero_pixel;
-
-		meani = 0;
-		stdi = 0;
-		Number_non_zero_pixel = 0;
-
-		img.create(nx, ny, CV_8UC1); 
-
-		vector<vector<vector<float>>> matrixi;
-		vector<vector<float>> ave;
-
-		matrixi.resize(nx);
-		ave.resize(nx);
-
-		for (int i = 0; i < nx; i++)
-		{
-			matrixi[i].resize(ny);
-			ave[i].resize(ny);
-			for (int j = 0; j < ny; j++)
-			{
-				matrixi[i][j].push_back(0);
-			}
-		}
-
-		switch (whatcloud)
-		{
-		case 0: //Original Point Cloud
-			for (int i = 0; i < nx; i++)
-			{
-				for (int j = 0; j < ny; j++)
-				{
-					for (auto k = CMatrixIndice[i][j].begin(); k != CMatrixIndice[i][j].end(); ++k)
-						matrixi[i][j].push_back(cloud->points[*k].intensity);
-				}
-			}
-			break;
-		case 1: //Ground Point Cloud
-			for (int i = 0; i < nx; i++)
-			{
-				for (int j = 0; j < ny; j++)
-				{
-					for (auto k = GCMatrixIndice[i][j].begin(); k != GCMatrixIndice[i][j].end(); ++k) 
-						matrixi[i][j].push_back(cloud->points[*k].intensity);
-				}
-			}
-			break;
-		case 2: //Non-Ground Point Cloud
-			for (int i = 0; i < nx; i++)
-			{
-				for (int j = 0; j < ny; j++)
-				{
-					for (auto k = NGCMatrixIndice[i][j].begin(); k != NGCMatrixIndice[i][j].end(); ++k) 
-						matrixi[i][j].push_back(cloud->points[*k].intensity);
-				}
-			}
-			break;
-		}
-
-		for (int i = 0; i < nx; i++)
-		{
-			for (int j = 0; j < ny; j++)
-			{
-				ave[i][j] = (0.001 + accumulate(begin(matrixi[i][j]), end(matrixi[i][j]), 0.0)) / matrixi[i][j].size();
-			}
-		}
-
-		for (int i = 0; i < nx; i++)
-		{
-			for (int j = 0; j < ny; j++)
-			{
-				if (ave[i][j] > 1)
-				{
-					meani += ave[i][j];
-					Number_non_zero_pixel++;
-				}
-			}
-		}
-		meani /= Number_non_zero_pixel;
-
-		for (int i = 0; i < nx; i++)
-		{
-			for (int j = 0; j < ny; j++)
-			{
-				if (ave[i][j] > 1)
-				{
-					stdi += (ave[i][j] - meani) * (ave[i][j] - meani);
-				}
-			}
-		}
-
-		stdi /= Number_non_zero_pixel;
-		stdi = sqrt(stdi);
-		maxi = meani + times_std * stdi; 
-		for (int i = 0; i < nx; i++)
-		{
-			for (int j = 0; j < ny; j++)
-			{
-				if (ave[i][j] > maxi)
-					ave[i][j] = maxi;
-				img.at<uchar>(i, j) = 255 * ave[i][j] / maxi ;
-			}
-		}
-	}
-
-	void Imageprocess::pc2imgZ(const pcXYZIPtr &cloud, int whatcloud, Mat &img)
-	{
-
-		float minaz, maxaz;			 
-		img.create(nx, ny, CV_8UC1); 
-
-		minaz = FLT_MAX;
-		maxaz = -FLT_MAX;
-
-		vector<vector<vector<float>>> matrixz;
-		vector<vector<float>> ave;
-		matrixz.resize(nx);
-		ave.resize(nx);
-
-		for (int i = 0; i < nx; i++)
-		{
-			matrixz[i].resize(ny);
-			ave[i].resize(ny);
-			for (int j = 0; j < ny; j++)
-			{
-				matrixz[i][j].push_back(minZ); 
-			}
-		}
-
-		switch (whatcloud)
-		{
-		case 0: //Original Point Cloud
-			for (int i = 0; i < nx; i++)
-			{
-				for (int j = 0; j < ny; j++)
-				{
-					for (auto k = CMatrixIndice[i][j].begin(); k != CMatrixIndice[i][j].end(); ++k) 
-						matrixz[i][j].push_back(cloud->points[*k].z);
-				}
-			}
-			break;
-		case 1: //Ground Point Cloud
-			for (int i = 0; i < nx; i++)
-			{
-				for (int j = 0; j < ny; j++)
-				{
-					for (auto k = GCMatrixIndice[i][j].begin(); k != GCMatrixIndice[i][j].end(); ++k)
-						matrixz[i][j].push_back(cloud->points[*k].z);
-				}
-			}
-			break;
-		case 2: //Non-Ground Point Cloud
-			for (int i = 0; i < nx; i++)
-			{
-				for (int j = 0; j < ny; j++)
-				{
-					for (auto k = NGCMatrixIndice[i][j].begin(); k != NGCMatrixIndice[i][j].end(); ++k) 
-						matrixz[i][j].push_back(cloud->points[*k].z);
-				}
-			}
-			break;
-		}
-
-		for (int i = 0; i < nx; i++)
-		{
-			for (int j = 0; j < ny; j++)
-				ave[i][j] = (0.1 + accumulate(begin(matrixz[i][j]), end(matrixz[i][j]), 0.0)) / matrixz[i][j].size();
-		}
-
-		for (int i = 0; i < nx; i++)
-		{
-			for (int j = 0; j < ny; j++)
-			{
-				maxaz = max(maxaz, ave[i][j]);
-				minaz = min(minaz, ave[i][j]);
-			}
-		} 
-
-		for (int i = 0; i < nx; i++)
-		{
-			for (int j = 0; j < ny; j++)
-				img.at<uchar>(i, j) = 255 * (ave[i][j] - minaz) / (maxaz - minaz);
-		}
-	}
-
-	void Imageprocess::pc2imgD(const pcXYZIPtr &cloud, int whatcloud, Mat &img, float expected_max_point_num_in_a_pixel)
-	{
-
-		img.create(nx, ny, CV_8UC1); 
-		Eigen::MatrixXi Matrixnum;
-		int maxnum, maxelement;
-		Matrixnum.resize(nx, ny);
-		Matrixnum = Eigen::MatrixXi::Zero(nx, ny);
-
-		switch (whatcloud)
-		{
-		case 0: //Original Point Cloud
-			for (int i = 0; i < nx; i++)
-			{
-				for (int j = 0; j < ny; j++)
-					Matrixnum(i, j) = CMatrixIndice[i][j].size();
-			}
-			break;
-		case 1: //Ground Point Cloud
-			for (int i = 0; i < nx; i++)
-			{
-				for (int j = 0; j < ny; j++)
-					Matrixnum(i, j) = GCMatrixIndice[i][j].size();
-			}
-			break;
-		case 2: //Non-Ground Point Cloud
-			for (int i = 0; i < nx; i++)
-			{
-				for (int j = 0; j < ny; j++)
-					Matrixnum(i, j) = NGCMatrixIndice[i][j].size();
-			}
-			break;
-		}
-
-		//maxelement = Matrixnum.maxCoeff();
-		//if (maxelement < expectedmaxnum) maxnum = maxelement;
-		//else maxnum = expectedmaxnum;
-		maxnum = expected_max_point_num_in_a_pixel;
-
-		//cout << "max point number"<<maxnum<<endl;
-		for (size_t i = 0; i < nx; i++)
-		{
-			for (size_t j = 0; j < ny; j++)
-			{
-				int out;
-				if (Matrixnum(i, j) < maxnum)
-					out = 255 * Matrixnum(i, j) / maxnum;
-				else
-					out = 255;
-				img.at<uchar>(i, j) = out;
-			}
-		}
-	}
-
-	void Imageprocess::img2pc_g(const Mat &img, const pcXYZIPtr &incloud, pcXYZIPtr &outcloud)
-	{
-
-		Mat grayImage, binImage;
-		cvtColor(img, grayImage, COLOR_BGR2GRAY);
-		threshold(grayImage, binImage, 0, 1, cv::THRESH_BINARY);
-
-		for (size_t i = timin; i < timin + img.rows; i++)
-		{
-			for (size_t j = tjmin; j < tjmin + img.cols; j++)
-			{
-				if (binImage.at<uchar>(i - timin, j - tjmin) == 1)
-				{
-					for (auto k = GCMatrixIndice[i][j].begin(); k != GCMatrixIndice[i][j].end(); ++k)
-						outcloud->points.push_back(incloud->points[*k]);
-				}
-			}
-		}
-	}
-
-	void Imageprocess::img2pc_c(const Mat &img, const pcXYZIPtr &incloud, pcXYZIPtr &outcloud)
-	{
-
-		Mat grayImage, binImage;
-		cvtColor(img, grayImage, COLOR_BGR2GRAY);
-		threshold(grayImage, binImage, 0, 1, cv::THRESH_BINARY);
-
-		for (size_t i = timin; i < timin + img.rows; i++)
-		{
-			for (size_t j = tjmin; j < tjmin + img.cols; j++)
-			{
-				if (binImage.at<uchar>(i - timin, j - tjmin) == 1)
-				{
-					for (auto k = CMatrixIndice[i][j].begin(); k != CMatrixIndice[i][j].end(); ++k)
-						outcloud->points.push_back(incloud->points[*k]);
-				}
-			}
-		}
-	}
-
-	void Imageprocess::img2pclabel_g(const Mat &img, const pcXYZIPtr &incloud, vector<pcXYZI> &outclouds, double dZ)
-	{
-		int classNo = 0;
-
-		outclouds.resize(totallabel - 1);
-
-		timin = 0;
-		tjmin = 0;
-
-		for (int i = timin; i < timin + img.rows; i++)
-		{
-			const int *data_src = (int *)img.ptr<int>(i - timin);
-			for (int j = tjmin; j < tjmin + img.cols; j++)
-			{
-				int pixelValue = data_src[j - tjmin];
-
-				if (pixelValue > 1)
-				{
-					double max_z, min_z, disz;
-					max_z = -DBL_MAX;
-					min_z = DBL_MAX;
-
-					for (int k = 0; k < GCMatrixIndice[i][j].size(); k++)
-					{
-
-						if (max_z < incloud->points[GCMatrixIndice[i][j][k]].z)
-							max_z = incloud->points[GCMatrixIndice[i][j][k]].z;
-						if (min_z > incloud->points[GCMatrixIndice[i][j][k]].z)
-							min_z = incloud->points[GCMatrixIndice[i][j][k]].z;
-					}
-					disz = max_z - min_z;
-					if (disz < dZ)
-					{
-						for (auto g = GCMatrixIndice[i][j].begin(); g != GCMatrixIndice[i][j].end(); ++g)
-							outclouds[pixelValue - 2].points.push_back(incloud->points[*g]);
-					}
-					else
-					{
-						if (outclouds[pixelValue - 2].size() == 0)
-							outclouds[pixelValue - 2].points.push_back(incloud->points[GCMatrixIndice[i][j][0]]); 
-					}
-				}
-			}
-		}
-
-		for (int k = 0; k <= totallabel - 2; k++)
-		{
-			if (outclouds[k].size() > 0)
-				classNo++;
-		}
-		//cout << "Cloud Number: " << classNo << endl;
-	}
-
-	void Imageprocess::img2pclabel_c(const Mat &img, const pcXYZIPtr &incloud, vector<pcXYZI> &outclouds, double dZ)
-	{
-		int classNo = 0;
-
-		outclouds.resize(totallabel - 1);
-
-		for (int i = timin; i < timin + img.rows; i++)
-		{
-			const int *data_src = (int *)img.ptr<int>(i - timin);
-			for (int j = tjmin; j < tjmin + img.cols; j++)
-			{
-				int pixelValue = data_src[j - tjmin];
-
-				if (pixelValue > 1)
-				{
-					double max_z, min_z, disz;
-					max_z = -DBL_MAX;
-					min_z = DBL_MAX;
-
-					for (int k = 0; k < CMatrixIndice[i][j].size(); k++)
-					{
-
-						if (max_z < incloud->points[CMatrixIndice[i][j][k]].z)
-							max_z = incloud->points[CMatrixIndice[i][j][k]].z;
-						if (min_z > incloud->points[CMatrixIndice[i][j][k]].z)
-							min_z = incloud->points[CMatrixIndice[i][j][k]].z;
-					}
-					disz = max_z - min_z;
-					if (disz < dZ)
-					{
-						for (auto g = CMatrixIndice[i][j].begin(); g != CMatrixIndice[i][j].end(); ++g)
-							outclouds[pixelValue - 2].points.push_back(incloud->points[*g]);
-					}
-					else
-					{
-						if (outclouds[pixelValue - 2].size() == 0)
-							outclouds[pixelValue - 2].points.push_back(incloud->points[CMatrixIndice[i][j][0]]); //������ֿյ�����֮���ٰ������˳�
-					}
-				}
-			}
-		}
-
-		for (int k = 0; k <= totallabel - 2; k++)
-		{
-			if (outclouds[k].size() > 0)
-				classNo++;
-		}
-		cout << "Cloud Number: " << classNo << endl;
-	}
+    void Imageprocess::pcgrid(Bounds &boundingbox, float resolution)
+    {
+        const float lx = boundingbox.max_x - boundingbox.min_x;
+        const float ly = boundingbox.max_y - boundingbox.min_y;
+        const float lz = boundingbox.max_z - boundingbox.min_z;
+        if (!std::isfinite(resolution) || resolution <= 0 ||
+            !std::isfinite(lx) || !std::isfinite(ly) || lx < 0 || ly < 0 ||
+            static_cast<double>(lx) / resolution >= INT_MAX ||
+            static_cast<double>(ly) / resolution >= INT_MAX)
+            throw std::invalid_argument("Invalid projection bounds or grid resolution");
+        minX = -0.5f * lx;
+        minY = -0.5f * ly;
+        minZ = -0.5f * lz;
+        nx = lx / resolution + 1;
+        ny = ly / resolution + 1;
+        res = resolution;
+        const std::size_t pixels = static_cast<std::size_t>(nx) * ny;
+        if (pixels >= std::numeric_limits<std::uint32_t>::max())
+            throw std::length_error("Projection grid exceeds the compact index limit; increase resolution");
+        for (int which = 0; which < 3; ++which) releaseGridIndices(which);
+        cout << "Image Size: " << nx << " x " << ny << endl;
+    }
+
+    std::size_t Imageprocess::pixelIndex(const pcl::PointXYZI &point) const
+    {
+        const float x = (point.x - minX) / res;
+        const float y = (point.y - minY) / res;
+        // Small coordinate rounding at the grid boundary is handled without
+        // permitting non-finite or genuinely out-of-bounds coordinates.
+        if (!std::isfinite(x) || !std::isfinite(y) || x < -0.001f || y < -0.001f ||
+            x >= nx || y >= ny)
+            throw std::out_of_range("Point lies outside the projection grid");
+        return static_cast<std::size_t>(std::max(0, static_cast<int>(x))) * ny +
+               std::max(0, static_cast<int>(y));
+    }
+
+    void Imageprocess::buildPointIndex(const pcXYZIPtr &cloud, PixelPointIndex &index)
+    {
+        const std::size_t pixels = static_cast<std::size_t>(nx) * ny;
+        if (cloud->size() >= std::numeric_limits<std::uint32_t>::max())
+            throw std::length_error("Point cloud exceeds the compact index limit");
+        index.offsets.assign(pixels + 1, 0);
+        index.points.resize(cloud->size());
+        for (const auto &point : *cloud) ++index.offsets[pixelIndex(point) + 1];
+        for (std::size_t pixel = 1; pixel <= pixels; ++pixel)
+            index.offsets[pixel] += index.offsets[pixel - 1];
+        // Reuse the offsets as insertion cursors and restore them afterwards.
+        // Stable insertion retains the previous per-pixel point order.
+        for (std::size_t point = 0; point < cloud->size(); ++point)
+            index.points[index.offsets[pixelIndex((*cloud)[point])]++] = point;
+        for (std::size_t pixel = pixels; pixel > 0; --pixel)
+            index.offsets[pixel] = index.offsets[pixel - 1];
+        index.offsets[0] = 0;
+    }
+
+    const Imageprocess::PixelPointIndex &Imageprocess::pointIndex(int whatcloud) const
+    {
+        if (whatcloud < 0 || whatcloud > 2 || point_indices_[whatcloud].offsets.empty())
+            throw std::invalid_argument("Requested point index has not been built or was released");
+        return point_indices_[whatcloud];
+    }
+
+    void Imageprocess::releaseGridIndices(int whatcloud)
+    {
+        if (whatcloud < 0 || whatcloud > 2) throw std::invalid_argument("Invalid cloud type");
+        PixelPointIndex empty;
+        point_indices_[whatcloud].offsets.swap(empty.offsets);
+        point_indices_[whatcloud].points.swap(empty.points);
+    }
+
+    void Imageprocess::savepcgrid(Bounds &boundingbox, float resolution,
+                                  pcXYZIPtr &cloud, pcXYZIPtr &ground, pcXYZIPtr &non_ground)
+    {
+        pcgrid(boundingbox, resolution);
+        // The main pipeline never projects or retrieves original-cloud points.
+        cloud.reset(new pcXYZI());
+        buildPointIndex(ground, point_indices_[1]);
+        buildPointIndex(non_ground, point_indices_[2]);
+    }
+
+    void Imageprocess::savepcgrid(Bounds &boundingbox, float resolution, const pcXYZIPtr &cloud)
+    {
+        pcgrid(boundingbox, resolution);
+        buildPointIndex(cloud, point_indices_[0]);
+    }
+
+    void Imageprocess::pc2imgI(const pcXYZIPtr &cloud, int whatcloud, Mat &img, float times_std)
+    {
+        const auto &index = pointIndex(whatcloud);
+        const std::size_t pixels = static_cast<std::size_t>(nx) * ny;
+        std::vector<float> averages(pixels);
+        double mean = 0, variance = 0;
+        std::size_t non_zero_pixels = 0;
+        for (std::size_t pixel = 0; pixel < pixels; ++pixel)
+        {
+            double sum = 0;
+            const auto begin = index.offsets[pixel], end = index.offsets[pixel + 1];
+            for (auto k = begin; k < end; ++k) sum += (*cloud)[index.points[k]].intensity;
+            // Preserve the original zero seed and floating-point averaging.
+            averages[pixel] = (0.001 + sum) / (static_cast<double>(end - begin) + 1);
+            if (averages[pixel] > 1)
+            {
+                mean += averages[pixel];
+                ++non_zero_pixels;
+            }
+        }
+        img = Mat::zeros(nx, ny, CV_8UC1);
+        if (non_zero_pixels == 0) return;
+        mean /= non_zero_pixels;
+        for (float value : averages)
+            if (value > 1) variance += (value - mean) * (value - mean);
+        const double maximum = mean + times_std * std::sqrt(variance / non_zero_pixels);
+        if (!std::isfinite(maximum) || maximum <= 0) return;
+        for (int row = 0; row < nx; ++row)
+        {
+            auto *output = img.ptr<uchar>(row);
+            for (int col = 0; col < ny; ++col)
+            {
+                const std::size_t pixel = static_cast<std::size_t>(row) * ny + col;
+                if (averages[pixel] > maximum) averages[pixel] = maximum;
+                output[col] = 255 * averages[pixel] / maximum;
+            }
+        }
+    }
+
+    void Imageprocess::pc2imgZ(const pcXYZIPtr &cloud, int whatcloud, Mat &img)
+    {
+        const auto &index = pointIndex(whatcloud);
+        const std::size_t pixels = static_cast<std::size_t>(nx) * ny;
+        std::vector<float> averages(pixels);
+        float minimum = FLT_MAX, maximum = -FLT_MAX;
+        for (std::size_t pixel = 0; pixel < pixels; ++pixel)
+        {
+            double sum = minZ;
+            const auto begin = index.offsets[pixel], end = index.offsets[pixel + 1];
+            for (auto k = begin; k < end; ++k) sum += (*cloud)[index.points[k]].z;
+            averages[pixel] = (0.1 + sum) / (static_cast<double>(end - begin) + 1);
+            minimum = std::min(minimum, averages[pixel]);
+            maximum = std::max(maximum, averages[pixel]);
+        }
+        img = Mat::zeros(nx, ny, CV_8UC1);
+        if (maximum <= minimum) return;
+        for (int row = 0; row < nx; ++row)
+        {
+            auto *output = img.ptr<uchar>(row);
+            for (int col = 0; col < ny; ++col)
+                output[col] = 255 * (averages[static_cast<std::size_t>(row) * ny + col] - minimum) /
+                              (maximum - minimum);
+        }
+    }
+
+    void Imageprocess::pc2imgD(const pcXYZIPtr &cloud, int whatcloud, Mat &img, float expected_max)
+    {
+        if (!std::isfinite(expected_max) || expected_max <= 0)
+            throw std::invalid_argument("Expected point count per pixel must be positive");
+        const auto &index = pointIndex(whatcloud);
+        img.create(nx, ny, CV_8UC1);
+        // Preserve the historical integer cap, but keep empty pixels black
+        // when fine grids imply fewer than one expected point per pixel.
+        const double cap = std::max(1.0, std::floor(static_cast<double>(expected_max)));
+        for (int row = 0; row < nx; ++row)
+        {
+            auto *output = img.ptr<uchar>(row);
+            for (int col = 0; col < ny; ++col)
+            {
+                const std::size_t pixel = static_cast<std::size_t>(row) * ny + col;
+                const auto count = index.offsets[pixel + 1] - index.offsets[pixel];
+                output[col] = count < cap ? 255 * count / cap : 255;
+            }
+        }
+    }
+
+    void Imageprocess::imageToCloud(const Mat &img, const pcXYZIPtr &cloud,
+                                    pcXYZIPtr &out, int whatcloud)
+    {
+        const auto &index = pointIndex(whatcloud);
+        Mat gray, binary;
+        cvtColor(img, gray, COLOR_BGR2GRAY);
+        threshold(gray, binary, 0, 1, cv::THRESH_BINARY);
+        for (int row = 0; row < img.rows; ++row)
+            for (int col = 0; col < img.cols; ++col)
+                if (binary.at<uchar>(row, col))
+                {
+                    const std::size_t pixel = static_cast<std::size_t>(row + timin) * ny + col + tjmin;
+                    for (auto k = index.offsets.at(pixel); k < index.offsets.at(pixel + 1); ++k)
+                        out->points.push_back((*cloud)[index.points[k]]);
+                }
+    }
+
+    void Imageprocess::img2pc_g(const Mat &img, const pcXYZIPtr &cloud, pcXYZIPtr &out)
+    {
+        imageToCloud(img, cloud, out, 1);
+    }
+
+    void Imageprocess::img2pc_c(const Mat &img, const pcXYZIPtr &cloud, pcXYZIPtr &out)
+    {
+        imageToCloud(img, cloud, out, 0);
+    }
+
+    void Imageprocess::labelsToCloud(const Mat &img, const pcXYZIPtr &cloud,
+                                     vector<pcXYZI> &out, double dZ, int whatcloud)
+    {
+        const auto &index = pointIndex(whatcloud);
+        out.clear();
+        out.resize(std::max(0, totallabel - 1));
+        for (int row = 0; row < img.rows; ++row)
+        {
+            const int *labels = img.ptr<int>(row);
+            for (int col = 0; col < img.cols; ++col)
+            {
+                const int label = labels[col];
+                if (label <= 1) continue;
+                const std::size_t pixel = static_cast<std::size_t>(row + timin) * ny + col + tjmin;
+                const auto begin = index.offsets.at(pixel), end = index.offsets.at(pixel + 1);
+                if (begin == end) continue; // Filled pixels need not contain points.
+                double minimum = DBL_MAX, maximum = -DBL_MAX;
+                for (auto k = begin; k < end; ++k)
+                {
+                    const auto &point = (*cloud)[index.points[k]];
+                    minimum = std::min(minimum, static_cast<double>(point.z));
+                    maximum = std::max(maximum, static_cast<double>(point.z));
+                }
+                auto &candidate = out.at(label - 2);
+                if (maximum - minimum < dZ)
+                    for (auto k = begin; k < end; ++k)
+                        candidate.points.push_back((*cloud)[index.points[k]]);
+                else if (candidate.empty())
+                    candidate.points.push_back((*cloud)[index.points[begin]]);
+            }
+        }
+    }
+
+    void Imageprocess::img2pclabel_g(const Mat &img, const pcXYZIPtr &cloud,
+                                     vector<pcXYZI> &out, double dZ)
+    {
+        timin = tjmin = 0;
+        labelsToCloud(img, cloud, out, dZ, 1);
+    }
+
+    void Imageprocess::img2pclabel_c(const Mat &img, const pcXYZIPtr &cloud,
+                                     vector<pcXYZI> &out, double dZ)
+    {
+        labelsToCloud(img, cloud, out, dZ, 0);
+    }
 
 	Mat Imageprocess::Sobelboundary(Mat img0)
 	{
@@ -727,95 +484,39 @@ namespace roadmarking
 		//cout << "Number label: " << totallabel << endl;
 	}
 
-	void Imageprocess::CcaBySeedFill(const Mat &_binImg, Mat &_lableImg)
-	{
-		// connected component analysis (8-component)
-		// use seed filling algorithm
-		// 1. begin with a foreground pixel and push its foreground neighbors into a stack;
-		// 2. pop the top pixel on the stack and label it with the same label until the stack is empty
-		//
-		// foreground pixel: _binImg(x,y) = 1
-		// background pixel: _binImg(x,y) = 0
-
-		if (_binImg.empty() ||
-			_binImg.type() != CV_8UC1)
-		{
-			cout << "Wrong type" << endl;
-			return;
-		}
-
-		_lableImg.release();
-		_binImg.convertTo(_lableImg, CV_32SC1); 
-
-		int label = 1; // start by 2
-		//vector<vector<pair<int, int>>> labeledPixel;
-		//labeledPixel.resize(10000);
-
-		int rows = _binImg.rows;
-		int cols = _binImg.cols;
-		for (int i = 1; i < rows - 1; i++)
-		{
-			int *data = _lableImg.ptr<int>(i);
-			for (int j = 1; j < cols - 1; j++)
-			{
-				if (data[j] == 1)
-				{
-					std::stack<std::pair<int, int>> neighborPixels;
-					neighborPixels.push(std::pair<int, int>(i, j)); // pixel position: <i,j>
-					++label;										// begin with a new label
-					while (!neighborPixels.empty())
-					{
-						// get the top pixel on the stack and label it with the same label
-						std::pair<int, int> curPixel = neighborPixels.top();
-						int curX = curPixel.first;
-						int curY = curPixel.second;
-						_lableImg.at<int>(curX, curY) = label;
-
-						//pair<int, int> pixelcor(curX, curY);
-						//labeledPixel[label].push_back(pixelcor);
-
-						// pop the top pixel
-						neighborPixels.pop();
-
-						// push the 8-neighbors (foreground pixels)
-						if (_lableImg.at<int>(curX, curY - 1) == 1)
-						{ // left pixel
-							neighborPixels.push(std::pair<int, int>(curX, curY - 1));
-						}
-						if (_lableImg.at<int>(curX, curY + 1) == 1)
-						{ // right pixel
-							neighborPixels.push(std::pair<int, int>(curX, curY + 1));
-						}
-						if (_lableImg.at<int>(curX - 1, curY) == 1)
-						{ // up pixel
-							neighborPixels.push(std::pair<int, int>(curX - 1, curY));
-						}
-						if (_lableImg.at<int>(curX + 1, curY) == 1)
-						{ // down pixel
-							neighborPixels.push(std::pair<int, int>(curX + 1, curY));
-						}
-						if (_lableImg.at<int>(curX - 1, curY - 1) == 1)
-						{ // left up pixel
-							neighborPixels.push(std::pair<int, int>(curX - 1, curY - 1));
-						}
-						if (_lableImg.at<int>(curX - 1, curY + 1) == 1)
-						{ // left down pixel
-							neighborPixels.push(std::pair<int, int>(curX - 1, curY + 1));
-						}
-						if (_lableImg.at<int>(curX + 1, curY - 1) == 1)
-						{ // right up pixel
-							neighborPixels.push(std::pair<int, int>(curX + 1, curY - 1));
-						}
-						if (_lableImg.at<int>(curX + 1, curY + 1) == 1)
-						{ // right down pixel
-							neighborPixels.push(std::pair<int, int>(curX + 1, curY + 1));
-						}
-					}
-				}
-			}
-		}
-		totallabel = label;
-	}
+    void Imageprocess::CcaBySeedFill(const Mat &binary, Mat &labels)
+    {
+        if (binary.empty() || binary.type() != CV_8UC1)
+            throw std::invalid_argument("Connected components require a binary 8-bit image");
+        binary.convertTo(labels, CV_32SC1);
+        int label = 1;
+        std::vector<std::pair<int, int>> pending;
+        for (int row = 1; row < binary.rows - 1; ++row)
+            for (int col = 1; col < binary.cols - 1; ++col)
+            {
+                if (labels.at<int>(row, col) != 1) continue;
+                ++label;
+                labels.at<int>(row, col) = label;
+                pending.emplace_back(row, col);
+                while (!pending.empty())
+                {
+                    const auto pixel = pending.back();
+                    pending.pop_back();
+                    for (int dr = -1; dr <= 1; ++dr)
+                        for (int dc = -1; dc <= 1; ++dc)
+                        {
+                            const int r = pixel.first + dr, c = pixel.second + dc;
+                            if (r < 0 || r >= labels.rows || c < 0 || c >= labels.cols) continue;
+                            int &value = labels.at<int>(r, c);
+                            if (value != 1) continue;
+                            // Mark on insertion so a pixel is never queued repeatedly.
+                            value = label;
+                            pending.emplace_back(r, c);
+                        }
+                }
+            }
+        totallabel = label;
+    }
 
 	void Imageprocess::RemoveSmallRegion(const Mat &Src, Mat &Dst, int AreaLimit)
 	{

@@ -47,6 +47,8 @@ cmake --build build -j1
 
 6. Check the results in your output folder. You may use CloudCompare to visualize the point cloud and use AutoCAD or [ShareCAD](https://beta.sharecad.org/) to visualize the dxf files.
 
+The third numeric line in the parameter file sets the projection grid size in metres: `0.05` gives 5 cm pixels. Smaller pixels preserve narrower features but increase image memory in proportion to the inverse square of the grid size. Choose the expected point density and other thresholds for your data; finer grids alone do not guarantee better extraction. When fewer than one point per pixel is expected, the density image distinguishes occupied pixels from empty pixels.
+
 ------
 ### Citation
 

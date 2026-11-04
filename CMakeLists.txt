@@ -58,4 +58,11 @@ SET(DEP_LIBS ${DEP_LIBS} ${OpenCV_LIBS} ${PCL_LIBRARIES} ${libLAS_LIBRARIES})
 add_executable(roadmarking ${PROJECT_SOURCE_DIR}/test/roadmarking_main.cpp ${SRC_LIST})
 target_link_libraries(roadmarking ${DEP_LIBS})
 
+include(CTest)
+if(BUILD_TESTING)
+    add_executable(imageprocess_test tests/imageprocess_test.cpp src/imageprocess.cpp)
+    target_link_libraries(imageprocess_test ${DEP_LIBS})
+    add_test(NAME imageprocess_projection COMMAND imageprocess_test)
+endif()
+
 

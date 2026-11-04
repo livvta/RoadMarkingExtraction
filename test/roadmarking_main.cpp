@@ -178,6 +178,8 @@ int main(int argc, char *argv[])
         expectedmaxnum = io.paralist.density_threshold * density * resolution * resolution; // expectedmaxnum: expected max point number in a pixel
         ip.pc2imgD(gcloud, 1, imgD, expectedmaxnum);
     }
+    ip.releaseGridIndices(2);
+    if (!io.paralist.visualization_on) ngcloud.reset(new pcXYZI());
     cout << "Point Cloud --> Geo-referneced Image done\n";
 
     //Step 5. Image Processing
@@ -250,6 +252,8 @@ int main(int argc, char *argv[])
     //Step 6. 2D->3D back to point cloud
     //ip.img2pc_g(colorLabelImg, gcloud, outcloud);                //Ground Road Marking Points (All in one)
     ip.img2pclabel_g(labelImg, gcloud, outclouds, resolution / 5); //Ground Road Marking Points (Segmentation) //Elevation filter: the last parameter is set as the dZ threshold for single pixel
+
+    ip.releaseGridIndices(1);
 
     //Use Otsu (Intensity) Method and Statistics Outlier Remover to filter the point cloud
     seg.cloudFilter(outclouds, outcloud_otsu_sor, 256, 10, 2.5); // Three parameters: the first is for the histogram level of Otsu Thresholding , the second is for SOR neighbor number and the third is for SOR std threshold
